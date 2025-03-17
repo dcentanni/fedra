@@ -1094,9 +1094,10 @@ int EdbTrackP::EstimatePositionAt( Float_t z, EdbSegP &ss )
 {
   // use coordinates of 2 nearest to z points for track extrapolation or interpolation
   // TODO: dz=0: mean?
-
-  float x1,y1,tx,ty,dz;
-  if( N()<2 )
+  if( N()<2 ) return 0;
+  EdbSegP *s1=0,*s2=0;
+  float   dz1,dz2;   dz1=dz2=1e9f; //kMaxInt into float;
+  for(int i=0; i<N(); i++)
   {
     x1=X();
     y1=Y();
@@ -1130,8 +1131,15 @@ int EdbTrackP::EstimatePositionAt( Float_t z, EdbSegP &ss )
     x1  = s1->X();
     y1  = s1->Y();
   }
-  ss.SetX( x1 + dz*tx );
-  ss.SetY( y1 + dz*ty );
+  float dz0 = s2->Z()-s1->Z();
+  if(abs(dz0)<0.000000001) return 0;
+  float dx0 = s2->X()-s1->X();
+  float dy0 = s2->Y()-s1->Y();
+  float dz  = z-s1->Z();
+  float tx = dx0/dz0;
+  float ty = dy0/dz0;
+  ss.SetX( s1->X() + dz*tx );
+  ss.SetY( s1->Y() + dz*ty );
   ss.SetZ( z );
   ss.SetDZ( dz );           // keep dz distance
   ss.SetTX( tx );
