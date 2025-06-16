@@ -20,13 +20,18 @@ EdbID        idset;
 EdbPVRec     gAli;
 EdbScanProc  gSproc;
 EdbVertexRec gEVR;
+EdbVertexRec rfEVR;
+
+bool do_aftervtx = false;
 
 void VertexRec(EdbID id, TEnv &cenv);
 void ReadVertex(EdbID id,TEnv &env);
 void MakeScanCondBT(EdbScanCond &cond, TEnv &env);
 void SetTracksErrors(TObjArray &tracks, EdbScanCond &cond, float p, float m);
 void do_vertex(TEnv &env);
-void AddCompatibleTracks(EdbPVRec &v_trk, EdbPVRec &v_vtx);
+void AddCompatibleTracks(TEnv &env, EdbPVRec &v_trk, EdbPVRec &v_vtx, TNtuple* outTree);
+//void AttachTrack(EdbVertex *vtx, EdbTrackP *track);
+void AttachTrack(EdbVertex *vtx, TObjArray &comp_trks);
 bool IsCompatible(EdbVertex &v, EdbTrackP &t);
 void Display( const char *dsname,  EdbVertexRec *evr, TEnv &env );
 
@@ -183,6 +188,10 @@ int main(int argc, char* argv[])
     {
       do_display=true;
     }
+    else if(!strncmp(key,"-a",2))
+    {
+      do_aftervtx = true;
+    }
   } 
   cenv.WriteFile("vertex.save.rootrc");
  
@@ -231,7 +240,8 @@ void ReadVertex(EdbID id, TEnv &env)
 
   EdbDataProc *dproc = new EdbDataProc();
   TString name;
-  gSproc.MakeFileName(name,id,"vtx.root",false);
+  if(!do_aftervtx) gSproc.MakeFileName(name,id,"vtx.root",false);
+  else {gSproc.MakeFileName(name,id,"vtx.refit.root",false); }
   int nvtx = dproc->ReadVertexTree(gEVR, name.Data(), cutvtx);
   if(nvtx) {
     int do_addtracks = env.GetValue("emvertex.addtr.doit"         , 0);
@@ -241,7 +251,16 @@ void ReadVertex(EdbID id, TEnv &env)
       EdbPVRec *vtr = new EdbPVRec();
       vtr->SetScanCond( new EdbScanCond(gCond) );
       gSproc.ReadTracksTree( idset,*vtr, cuttr);
-      AddCompatibleTracks( *vtr, gAli );  // assign to the vertices of gAli additional tracks from vtr if any
+      TNtuple *outTree = new TNtuple("tracks", "tree of matched tracks downstream of vtx", "vID:ntrks:flag:vz:trid:nseg:npl:firstp:lastp:tz");
+      AddCompatibleTracks(env, *vtr, gAli, outTree);  // assign to the vertices of gAli additional tracks from vtr if any
+      TString fname;
+      gSproc.MakeFileName(fname, id, "ntuple_revtx.root", false);
+      TFile *outFile = new TFile(fname.Data(), "RECREATE");
+      outFile->cd();
+      outTree->Write();
+      outFile->Write();
+      delete outTree;
+      delete outFile;
     }
   }
 }
@@ -315,24 +334,100 @@ void MakeScanCondBT(EdbScanCond &cond, TEnv &env)
   cond.SetName("SND_basetrack");
 }
 
-void AddCompatibleTracks(EdbPVRec &v_trk, EdbPVRec &v_vtx)
+void AddCompatibleTracks(TEnv &env, EdbPVRec &v_trk, EdbPVRec &v_vtx, TNtuple *outTree)
 {
   int ntr  = v_trk.Ntracks();
   int nvtx = v_vtx.Nvtx();
+  rfEVR.eEdbTracks = gAli.eTracks;
+  rfEVR.SetPVRec(&gAli);
+  rfEVR.eDZmax      = env.GetValue("emvertex.vtx.DZmax"         , 3000.);
+  rfEVR.eProbMin    = env.GetValue("emvertex.vtx.ProbMinV"      , 0.001);
+  rfEVR.eImpMax     = env.GetValue("emvertex.vtx.ImpMax"        , 10.);
+  rfEVR.eUseMom     = env.GetValue("emvertex.vtx.UseMom"        , false);
+  rfEVR.eUseSegPar  = env.GetValue("emvertex.vtx.UseSegPar"     , false);
+  rfEVR.eQualityMode= env.GetValue("emvertex.vtx.QualityMode"   , 0);  // (0:=Prob/(sigVX^2+sigVY^2); 1:= inverse average track-vertex distance)
   Log(1,"AddCompatibleTracks", "%d tracks, %d vertex", ntr,nvtx );
   for(int iv=0; iv<nvtx; iv++)
   {
-    EdbVertex *v = v_vtx.GetVertex(iv);
+    bool found_track = false;
+    int zpostracks = 0;
+    EdbVertex *v = v_vtx.GetVertex(iv);	  
+    //if (v->Flag()==0) continue; // ONE CUT IS HERE
+    std::vector<int> trackids;
+    for(int i=0; i<v->N(); i++){
+      EdbTrackP *t = (EdbTrackP*)v->GetTrack(i);
+      if (v->GetVTa(i)->Zpos()==0) zpostracks +=1;
+      int trid = t->ID();
+      trackids.push_back(trid);
+    }
+    //if (zpostracks > 1) continue; // SECOND CUT IS HERE
+    Log(2, "AddCompatibleTracks", "Checking for neighbours for vtx %d", v->ID());
+    //v->Print();
+    TObjArray comp_trks;
     for(int it=0; it<ntr; it++) 
     {
       EdbTrackP *t = v_trk.GetTrack(it);
+      int trid = t->ID();
+      if (std::find(trackids.begin(), trackids.end(), trid)!=trackids.end()) {Log(3, "AddCompatibleTracks", "Track %d already in the vertex", t->ID());continue;} //Maybe here can be changed to EdbVertex::TrackInVertex(EdbTrackP *t)
+      if (t->Z() < v->VZ()) continue; 
       if( IsCompatible(*v,*t) ) {
-	t->SetFlag(999999);
-	v_vtx.AddTrack(t);
+        t->SetFlag(999999);
+        found_track = true;
+        Log(2, "AddCompatibleTrack", "Track found %d", t->ID());
+        //v_vtx.AddTrack(t);
+        outTree->Fill(v->ID(),v->N(),v->Flag(),v->VZ(),t->ID(),t->N(),t->Npl(),t->GetSegmentFirst()->Plate(),t->GetSegmentLast()->Plate(),t->Z());
+        comp_trks.Add(t);
+      	//if(do_aftervtx and v->Flag()==1) AttachTrack(v, t);
       }
     }
+  if(!found_track && do_aftervtx) {outTree->Fill(v->ID(),v->N(),v->Flag(),v->VZ(),0,0,0,0,0,0); rfEVR.AddVertex(v);}
+  else{AttachTrack(v, comp_trks);}
+  }
+  if(do_aftervtx){
+    TString name;
+    gSproc.MakeFileName(name,idset,"vtx.aftervtx.root",false);
+    EdbDataProc::MakeVertexTree(*(rfEVR.eVTX),name.Data());
   }
 }
+//void AttachTrack(EdbVertex *vtx, EdbTrackP *track)
+void AttachTrack(EdbVertex *vtx, TObjArray &comp_trks)
+{
+  // Make a new EdbVertex object in order to not change the original EdbVertex obj
+  EdbVertex *vtx_new = new EdbVertex();
+  for (int t=0;t<vtx->N();t++)
+  {
+    EdbVTA *vta = nullptr;
+    vta = rfEVR.AddTrack(*vtx_new, (EdbTrackP*)vtx->GetTrack(t), vtx->Zpos(t));
+  }
+  if (vtx->N() != vtx_new->N())
+  {
+    Log(2, "AttachTrack", "Multiplicities between vtx and vtx_new mismatch before VTA, printing them");
+    if( gEDBDEBUGLEVEL >= 2) {vtx->Print();vtx_new->Print();}
+  }
+  vtx_new->SetID(vtx->ID());
+  for(int i=0; i<comp_trks.GetEntries();i++)
+  {
+    EdbTrackP *track = static_cast<EdbTrackP*>(comp_trks.At(i));
+    Log(2, "AttachTrack", "Attaching track %d to vertex %d at z=%f", track->ID(), vtx->ID(), vtx->VZ());
+    EdbVTA *vta_out = nullptr;
+    vta_out = rfEVR.AddTrack(*vtx_new, track, 1);
+    //EdbVTA *vta_out = new EdbVTA(track, vtx_new);
+    //vtx_new->AddVTA(vta_out);
+    //vta_out->SetZpos(1);
+    //track->AddVTA(vta_out);
+    //rfEVR.ePVR->AddTrack(track);
+    Log(2, "AttachTrack", "Track %d found and added to the vertex %d", track->ID(), vtx_new->ID());
+  }
+  Log(2, "AttachTrack", "New vertex created vID=%d, prob is %.3f, the original one was %.3f", vtx_new->ID(), vtx_new->V()->prob(), vtx->V()->prob());
+  if (rfEVR.MakeV(*vtx_new) ) {rfEVR.AddVertex(vtx_new);}
+  else {Log(1, "AttachTrack", "VERTEX %d NOT ADDED TO THE VERTEXREC", vtx_new->ID()); rfEVR.AddVertex(vtx);}
+  vtx_new->EstimateVertexFlag();
+  if (vtx->Flag()!=vtx_new->Flag()) {
+    Log(2, "AttachTrack", "FLAG HAS CHANGED FOR VID %d", vtx->ID());
+    vtx->Print();
+    vtx_new->Print();
+    }
+  }
 
 bool IsCompatible(EdbVertex &v, EdbTrackP &t)
 {
@@ -342,7 +437,7 @@ bool IsCompatible(EdbVertex &v, EdbTrackP &t)
   float dy=ss.Y()-v.VY();
   float r2 = Sqrt(dx*dx+dy*dy);
   float dz = Abs(ss.DZ());
-  if(r2<5&&dz<4000) { printf("r2=%.4f dz=%.2f\n",r2,ss.DZ()); return true;}
+  if(r2<5&&dz<4000) { printf("r2=%.4f dz=%.2f\n",r2,ss.DZ()); Log(2, "IsCompatible", "Track %d found at r2=%.4f dz=%.2f", t.ID(), r2, ss.DZ());return true;}
   return false;
 }
 
