@@ -1097,18 +1097,6 @@ int EdbTrackP::EstimatePositionAt( Float_t z, EdbSegP &ss )
   if( N()<2 ) return 0;
   EdbSegP *s1=0,*s2=0;
   float   dz1,dz2;   dz1=dz2=1e9f; //kMaxInt into float;
-  for(int i=0; i<N(); i++)
-  {
-    x1=X();
-    y1=Y();
-    tx=TX();
-    ty=TY();
-    dz=z-GetSegment(0)->Z();
-  }
-  else
-  {
-    EdbSegP *s1=0,*s2=0;
-    float   dz1,dz2;   dz1=dz2=kMaxInt;
     for(int i=0; i<N(); i++)
     {
       EdbSegP *s = GetSegment(i);
@@ -1121,16 +1109,6 @@ int EdbTrackP::EstimatePositionAt( Float_t z, EdbSegP &ss )
       float dz = Abs(s->Z()-z);
       if( dz < dz2 && s != s1 ) { dz2 = dz; s2=s; }
     }
-    float dz0 = s2->Z()-s1->Z();
-    if(abs(dz0)<0.000000001) {printf("dz0==0\n"); return 0;}
-    float dx0 = s2->X()-s1->X();
-    float dy0 = s2->Y()-s1->Y();
-    tx  = dx0/dz0;
-    ty  = dy0/dz0;
-    dz  = z-s1->Z();
-    x1  = s1->X();
-    y1  = s1->Y();
-  }
   float dz0 = s2->Z()-s1->Z();
   if(abs(dz0)<0.000000001) return 0;
   float dx0 = s2->X()-s1->X();
