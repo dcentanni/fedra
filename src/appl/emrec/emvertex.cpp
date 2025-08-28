@@ -573,9 +573,12 @@ void DiscardImp(TEnv &env, EdbPVRec &v_vtx, float imp_max)
     }
     vtx_new->SetID(v->ID());
     vtx_new->SetFlag(v->Flag());
-    if (rfEVR.MakeV(*vtx_new)) {rfEVR.AddVertex(vtx_new);}
-    else {Log(1, "DiscardImp", "VERTEX %d NOT ADDED TO THE VERTEXREC", vtx_new->ID());} //rfEVR.AddVertex(v);}
-    Log(2, "DiscardImp", "New vertex created vID=%d, prob is %.3f, the original one was %.3f", vtx_new->ID(), vtx_new->V()->prob(), v->V()->prob());
+    if (rfEVR.MakeV(*vtx_new)) {
+      rfEVR.AddVertex(vtx_new);
+      Log(2, "DiscardImp", "New vertex created vID=%d, prob is %.3f, the original one was %.3f", vtx_new->ID(), vtx_new->V()->prob(), v->V()->prob());
+    }
+    else {Log(1, "DiscardImp", "VERTEX %d NOT ADDED TO THE VERTEXREC", vtx_new->ID()); rfEVR.AddVertex(v);}
+    
     //v->Print();
     //vtx_new->Print();
   }
