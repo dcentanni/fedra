@@ -39,6 +39,7 @@ void AddCompatibleTracks(TEnv &env, EdbPVRec &v_trk, EdbPVRec &v_vtx, float r2ma
 bool IsCompatible(EdbVertex &v, EdbTrackP &t, float r2max, float dzmax, float *r2, float *dz);
 void SplitTrack(EdbTrackP *t, EdbTrackP *&t_in, EdbTrackP *&t_out, Int_t zsplit);
 void ExecuteVTA(EdbVertex *vtx, EdbTrackP *track);
+void DiscardImp(TEnv &env, EdbPVRec &v_vtx, float imp_max = 10.);
 int SetSegmentsP(EdbTrackP t, float p) {for(int i=0; i<t.N(); i++) t.GetSegment(i)->SetP(p); return t.N();}
 void Display( const char *dsname,  EdbVertexRec *evr, TEnv &env );
 
@@ -264,6 +265,8 @@ void ReadVertex(EdbID id, TEnv &env)
   int nvtx = dproc->ReadVertexTree(gEVR, name.Data(), cutvtx);
   if(nvtx) {
     int do_addtracks = env.GetValue("emvertex.addtr.doit"         , 0);
+    float disc_imp = env.GetValue("emvertex.vtx.discimp"         , 0);
+    if (disc_imp > 0 && !do_addtracks) DiscardImp(env, gAli, disc_imp);
     if(do_addtracks)
     {
       TCut cuttr       = env.GetValue("emvertex.addtr.cuttr"        , "1");
@@ -280,6 +283,11 @@ void ReadVertex(EdbID id, TEnv &env)
       outFile->Close();
       delete outTree;
       delete outFile;
+    }
+    if (disc_imp > 0 && !do_addtracks){
+      TString dname;
+      gSproc.MakeFileName(dname,id,"vtx.discimp.root",false);
+      EdbDataProc::MakeVertexTree(*(rfEVR.eVTX),dname.Data());
     }
   }
 }
@@ -428,7 +436,7 @@ void AddCompatibleTracks(TEnv &env, EdbPVRec &v_trk, EdbPVRec &v_vtx, float r2ma
   TString name;
   gSproc.MakeFileName(name,idset,"vtx.refit.root",false);
   EdbDataProc::MakeVertexTree(*(rfEVR.eVTX),name.Data());
-}
+  }
 }
 
 bool IsCompatible(EdbVertex &v, EdbTrackP &t, float r2max, float dzmax, float *r2, float *dz)
@@ -540,7 +548,38 @@ void ExecuteVTA(EdbVertex *vtx, EdbTrackP *track)
   //SafeDelete(vta_in);
   //SafeDelete(vta_out);
 }
-
+//-----------------------------------------------------------------------------
+void DiscardImp(TEnv &env, EdbPVRec &v_vtx, float imp_max)
+{
+  Log(2, "DiscardImp", "Discarding tracks from vertices greater than %f microns", imp_max);
+  int nvtx = v_vtx.Nvtx();
+  rfEVR.eEdbTracks = gAli.eTracks;
+  rfEVR.SetPVRec(&gAli);
+  rfEVR.eDZmax      = env.GetValue("emvertex.vtx.DZmax"         , 3000.);
+  rfEVR.eProbMin    = env.GetValue("emvertex.vtx.ProbMinV"      , 0.001);
+  rfEVR.eImpMax     = env.GetValue("emvertex.vtx.ImpMax"        , 10.);
+  rfEVR.eUseMom     = env.GetValue("emvertex.vtx.UseMom"        , false);
+  rfEVR.eUseSegPar  = env.GetValue("emvertex.vtx.UseSegPar"     , false);
+  rfEVR.eQualityMode= env.GetValue("emvertex.vtx.QualityMode"   , 0);  // (0:=Prob/(sigVX^2+sigVY^2); 1:= inverse average track-vertex distance)
+  for(int iv=0; iv<nvtx; iv++){
+    EdbVertex *v = v_vtx.GetVertex(iv);
+    int ntrks = v->N();
+    // Make a new EdbVertex object in order to not change the original EdbVertex obj
+    EdbVertex *vtx_new = new EdbVertex();
+    for(int t=0; t<ntrks;t++){
+      EdbVTA *vta = nullptr;
+      if (v->GetVTa(t)->Imp() > imp_max) continue;
+      vta = rfEVR.AddTrack(*vtx_new, (EdbTrackP*)v->GetTrack(t), v->GetVTa(t)->Zpos());
+    }
+    vtx_new->SetID(v->ID());
+    if (rfEVR.MakeV(*vtx_new)) {rfEVR.AddVertex(vtx_new);}
+    else {Log(1, "DiscardImp", "VERTEX %d NOT ADDED TO THE VERTEXREC", vtx_new->ID()); rfEVR.AddVertex(v);}
+    Log(2, "DiscardImp", "New vertex created vID=%d, prob is %.3f, the original one was %.3f", vtx_new->ID(), vtx_new->V()->prob(), v->V()->prob());
+    v->Print();
+    vtx_new->Print();
+    vtx_new->SetFlag(v->Flag());
+  }
+}
 //-----------------------------------------------------------------------------
 void SetTracksErrors(TObjArray &tracks, EdbScanCond &cond, float p, float m)
 {
