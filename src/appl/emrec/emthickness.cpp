@@ -91,6 +91,7 @@ struct
   TProfile2D *thick_bot;
   TH2D       *thick_base;
   TProfile2D *glass;
+  float kRun;
 }H;                          //oputput histos
 
 struct
@@ -159,7 +160,6 @@ void generate_json_report(TH2* h, std::ofstream &report, bool first_plot)
       count++;
     }
   }
-  
   double mean = (count > 0) ? sum / count : 0;
   double rms = (count > 0) ? TMath::Sqrt(sum2/count - mean*mean) : 0;
   double empty_frac = (double)empty_bins / total_bins;
@@ -309,6 +309,7 @@ void make_canvas(const char *nameo="ccc")
   gStyle->SetPalette(107);
   gStyle->SetOptStat("");
   gStyle->SetPadRightMargin(0.12);
+  gStyle->SetLabelSize(0.04,"XYZ");
   
   TCanvas *cc = new TCanvas("thickness",Form("thickness at %s",nameo),1920,1080);
   
@@ -330,19 +331,21 @@ void make_canvas(const char *nameo="ccc")
     //tp->AddText("WARNING: Scanned area or empty fraction below requested!");
   }
   tp->Draw();
-  
+  TProfile2D* dummy= new TProfile2D("dummy", "", 1, 0, 200000, 1, 0, 200000);
+  dummy->SetStats(0);
+
   cc->cd(0);
   TPad    *pad = new TPad("pad","",0.,0.,1.,0.9);
   pad->Draw();
   pad->cd();
   pad->Divide(3,2, 0.01, 0.01);
-  
-  pad->cd(1);  H.nseg_top->Draw("prof colz");
-  pad->cd(4);  H.nseg_bot->Draw("prof colz");
-  pad->cd(2);  H.thick_top->Draw("prof colz");
-  pad->cd(5);  H.thick_bot->Draw("prof colz");
-  pad->cd(3);  H.thick_base->Draw("prof colz");
-  pad->cd(6);  H.glass->Draw("prof colz");
+  float zmax = H.kRun*3500.;
+  pad->cd(1);  dummy->SetTitle(H.nseg_top->GetTitle());dummy->SetMaximum(zmax);dummy->SetMinimum(0.);dummy->DrawCopy("AXIS COLZ");gPad->Update();H.nseg_top->Draw("same prof colz");H.nseg_top->SetStats(0);gPad->Update();
+  pad->cd(4);  dummy->SetTitle(H.nseg_bot->GetTitle());dummy->SetMaximum(zmax);dummy->SetMinimum(0.);dummy->DrawCopy("AXIS COLZ");gPad->Update();H.nseg_bot->Draw("same prof colz");H.nseg_bot->SetStats(0);gPad->Update();
+  pad->cd(2);  dummy->SetTitle(H.thick_top->GetTitle());dummy->SetMaximum(H.thick_top->GetMaximum());dummy->SetMinimum(H.thick_top->GetMinimum());dummy->DrawCopy("AXIS COLZ");gPad->Update();H.thick_top->Draw("same prof colz");gPad->Update();
+  pad->cd(5);  dummy->SetTitle(H.thick_bot->GetTitle());dummy->SetMaximum(H.thick_bot->GetMaximum());dummy->SetMinimum(H.thick_bot->GetMinimum());dummy->DrawCopy("AXIS COLZ");gPad->Update();H.thick_bot->Draw("same prof colz");gPad->Update();
+  pad->cd(3);  dummy->SetTitle(H.thick_base->GetTitle());dummy->SetMaximum(H.thick_base->GetMaximum());dummy->SetMinimum(H.thick_base->GetMinimum());dummy->DrawCopy("AXIS COLZ");gPad->Update();H.thick_base->Draw("same prof colz");gPad->Update();
+  pad->cd(6);  dummy->SetTitle(H.glass->GetTitle());dummy->SetMaximum(H.glass->GetMaximum());dummy->SetMinimum(H.glass->GetMinimum());dummy->DrawCopy("AXIS COLZ");gPad->Update();H.glass->Draw("same prof colz");gPad->Update();
   pad->cd(0);
   TDatime time;
   TText *t = new TText();
@@ -488,13 +491,17 @@ void make_snd_profiles( const char* nameo="snd_profiles" )
   pad->cd();
   pad->Divide(3,2, 0.01, 0.01);
 
+  float zmax = H.kRun*3500.;
+
   TLine *lineX1 = new TLine(B.xmin,P.Y0-P.width,B.xmax,P.Y0-P.width); lineX1->SetLineStyle(3);
   TLine *lineX2 = new TLine(B.xmin,P.Y0+P.width,B.xmax,P.Y0+P.width); lineX2->SetLineStyle(3);
   TLine *lineY1 = new TLine(P.X0-P.width,B.ymin,P.X0-P.width,B.ymax); lineY1->SetLineStyle(3);
   TLine *lineY2 = new TLine(P.X0+P.width,B.ymin,P.X0+P.width,B.ymax); lineY2->SetLineStyle(3);
-  pad->cd(1); Views->Draw(Form("eNsegments:eYview:eXview>>hxy1(%d,%f,%f,%d,%f,%f)",B.nx,B.xmin,B.xmax,B.ny,B.ymin,B.ymax), cTop ,"prof colz");
+  //pad->cd(1); Views->Draw(Form("eNsegments:eYview:eXview>>hxy1(%d,%f,%f,%d,%f,%f)",B.nx,B.xmin,B.xmax,B.ny,B.ymin,B.ymax), cTop ,"prof colz");
+  pad->cd(1);  H.nseg_top->SetMaximum(zmax); H.nseg_top->SetMinimum(0.); H.nseg_top->Draw("goff prof colz"); H.nseg_top->SetStats(0); gPad->Update();
   lineX1->Draw();  lineX2->Draw();  lineY1->Draw();  lineY2->Draw();
-  pad->cd(4); Views->Draw(Form("eNsegments:eYview:eXview>>hxy2(%d,%f,%f,%d,%f,%f)",B.nx,B.xmin,B.xmax,B.ny,B.ymin,B.ymax), cBot ,"prof colz");
+  //pad->cd(4); Views->Draw(Form("eNsegments:eYview:eXview>>hxy2(%d,%f,%f,%d,%f,%f)",B.nx,B.xmin,B.xmax,B.ny,B.ymin,B.ymax), cBot ,"prof colz");
+  pad->cd(4);  H.nseg_bot->SetMaximum(zmax); H.nseg_bot->SetMinimum(0.); H.nseg_bot->Draw("goff prof colz"); H.nseg_bot->SetStats(0); gPad->Update();
   lineX1->Draw();  lineX2->Draw();  lineY1->Draw();  lineY2->Draw();
 
   gStyle->SetOptStat("n");
@@ -634,6 +641,9 @@ int main(int argc, char *argv[])
     }
     if(!strncmp(key,"-v=",3)) {
       gEDBDEBUGLEVEL = atoi(key+3);
+    }
+    if(!strncmp(key,"-r=",3)) {
+       H.kRun = atoi(key+3);
     }
   }
 

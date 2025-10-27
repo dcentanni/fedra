@@ -220,7 +220,7 @@ void DrawOut(const EdbPattern &p, EdbMosaicIO &omio)
   gStyle->SetOptStat("n");
 
   if(do_save_canvas) omio.SaveFragmentObj( c, p.Plate(), p.Side(), p.ID(), "peaks");
-  if(do_save_gif) c->Print( omio.FileName( p.Brick(), p.Plate(), p.Side(), p.ID(), "", ".gif") );
+  if(do_save_gif) c->Print( omio.FileName( p.Brick(), p.Plate(), p.Side(), p.ID(), "", ".gif").c_str());
   delete c;
 }
 
