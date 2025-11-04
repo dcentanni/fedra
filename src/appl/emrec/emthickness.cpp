@@ -491,17 +491,22 @@ void make_snd_profiles( const char* nameo="snd_profiles" )
   pad->cd();
   pad->Divide(3,2, 0.01, 0.01);
 
+  TProfile2D* dummy= new TProfile2D("dummy2", "", 1, 0, 200000, 1, 0, 200000);
+  dummy->SetStats(0);
+
   float zmax = H.kRun*3500.;
 
   TLine *lineX1 = new TLine(B.xmin,P.Y0-P.width,B.xmax,P.Y0-P.width); lineX1->SetLineStyle(3);
   TLine *lineX2 = new TLine(B.xmin,P.Y0+P.width,B.xmax,P.Y0+P.width); lineX2->SetLineStyle(3);
   TLine *lineY1 = new TLine(P.X0-P.width,B.ymin,P.X0-P.width,B.ymax); lineY1->SetLineStyle(3);
   TLine *lineY2 = new TLine(P.X0+P.width,B.ymin,P.X0+P.width,B.ymax); lineY2->SetLineStyle(3);
+  
   //pad->cd(1); Views->Draw(Form("eNsegments:eYview:eXview>>hxy1(%d,%f,%f,%d,%f,%f)",B.nx,B.xmin,B.xmax,B.ny,B.ymin,B.ymax), cTop ,"prof colz");
-  pad->cd(1);  H.nseg_top->SetMaximum(zmax); H.nseg_top->SetMinimum(0.); H.nseg_top->Draw("goff prof colz"); H.nseg_top->SetStats(0); gPad->Update();
+  //pad->cd(1);  H.nseg_top->SetMaximum(zmax); H.nseg_top->SetMinimum(0.); H.nseg_top->Draw("goff prof colz"); H.nseg_top->SetStats(0); gPad->Update();
+  pad->cd(1); dummy->SetTitle(H.nseg_top->GetTitle());dummy->SetMaximum(zmax);dummy->SetMinimum(0.);dummy->DrawCopy("AXIS COLZ");gPad->Update();H.nseg_top->Draw("same goff prof colz");H.nseg_top->SetStats(0);gPad->Update();
   lineX1->Draw();  lineX2->Draw();  lineY1->Draw();  lineY2->Draw();
   //pad->cd(4); Views->Draw(Form("eNsegments:eYview:eXview>>hxy2(%d,%f,%f,%d,%f,%f)",B.nx,B.xmin,B.xmax,B.ny,B.ymin,B.ymax), cBot ,"prof colz");
-  pad->cd(4);  H.nseg_bot->SetMaximum(zmax); H.nseg_bot->SetMinimum(0.); H.nseg_bot->Draw("goff prof colz"); H.nseg_bot->SetStats(0); gPad->Update();
+  pad->cd(4);  dummy->SetTitle(H.nseg_bot->GetTitle());dummy->SetMaximum(zmax);dummy->SetMinimum(0.);dummy->DrawCopy("AXIS COLZ");gPad->Update();H.nseg_bot->Draw("same goff prof colz");H.nseg_bot->SetStats(0);gPad->Update();
   lineX1->Draw();  lineX2->Draw();  lineY1->Draw();  lineY2->Draw();
 
   gStyle->SetOptStat("n");
