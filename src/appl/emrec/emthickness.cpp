@@ -126,6 +126,10 @@ void set_default_env()
   cenv.SetValue("quality.request.Xmax"    , 185000.);
   cenv.SetValue("quality.request.Ymax"    , 185000.);
   cenv.SetValue("quality.request.fraction", 0.9   );
+  cenv.SetValue("quality.request.stepx", 1000   );
+  cenv.SetValue("quality.request.stepy", 1000   );
+  cenv.SetValue("quality.request.nx", 1000);
+  cenv.SetValue("quality.request.ny", 1000);
 
   cenv.SetValue("quality.prof"           , 1);
   cenv.SetValue("quality.prof.X0"        , 100000);
@@ -238,20 +242,34 @@ void define_steps(TTree *tree)
   TH1D *hy = get_h_var(tree,"headers.eYview","hy",FFT.bin,"!(eXview==0&&eYview==0)");
   //hx->Draw();
  
-  TH1D *hstepx = get_step_fft(hx);
-  TH1D *hstepy = get_step_fft(hy);
-  B.nx   = hstepx->GetXaxis()->GetNbins();
-  B.xmin = hstepx->GetXaxis()->GetXmin();
-  B.xmax = hstepx->GetXaxis()->GetXmax();
-  B.xbin = (B.xmax-B.xmin)/B.nx;
-  B.xmin-=5*B.xbin; B.nx+=5;
-  B.xmax+=5*B.xbin; B.nx+=5;
-  B.ny   = hstepy->GetXaxis()->GetNbins();
-  B.ymin = hstepy->GetXaxis()->GetXmin();
-  B.ymax = hstepy->GetXaxis()->GetXmax();
-  B.ybin = (B.ymax-B.ymin)/B.ny;
-  B.ymin-=5*B.ybin; B.ny+=5;
-  B.ymax+=5*B.ybin; B.ny+=5;
+  TH1D *hstepx = nullptr;
+  TH1D *hstepy = nullptr;
+  if (B.xbin > 999 || B.ybin > 999 || B.nx > 999 || B.ny > 999)
+  {
+	Log(1, "process_file", "Bin and pixel numbers not provided, using FFT estimation");
+	hstepx = get_step_fft(hx);
+  	hstepy = get_step_fft(hy);
+	B.nx   = hstepx->GetXaxis()->GetNbins();
+  	B.xmin = hstepx->GetXaxis()->GetXmin();
+  	B.xmax = hstepx->GetXaxis()->GetXmax();
+  	B.xbin = (B.xmax-B.xmin)/B.nx;
+  	B.xmin-=5*B.xbin; B.nx+=5;
+  	B.xmax+=5*B.xbin; B.nx+=5;
+  	B.ny   = hstepy->GetXaxis()->GetNbins();
+  	B.ymin = hstepy->GetXaxis()->GetXmin();
+  	B.ymax = hstepy->GetXaxis()->GetXmax();
+  	B.ybin = (B.ymax-B.ymin)/B.ny;
+  	B.ymin-=5*B.ybin; B.ny+=5;
+  	B.ymax+=5*B.ybin; B.ny+=5;
+  }
+  else
+  {
+	B.xmin = hx->GetXaxis()->GetXmin()-B.xbin;
+  	B.xmax = hx->GetXaxis()->GetXmax()+B.xbin;
+	B.ymin = hy->GetXaxis()->GetXmin()-B.ybin;
+  	B.ymax = hy->GetXaxis()->GetXmax()+B.ybin;
+	Log(1, "define_steps", "B.xmin = %f , B.xmax = %f , B.ymin = %f , B.ymax = %f", B.xmin, B.xmax, B.ymin, B.ymax);
+  }
 
   AREA.xminS = hx->GetXaxis()->GetXmin() - B.xbin;
   AREA.xmaxS = hx->GetXaxis()->GetXmax() + B.xbin;
@@ -607,6 +625,10 @@ int process_file(const char* input_file, const char* output_file)
   AREA.yminR = cenv.GetValue("quality.request.Ymin", 5000.);
   AREA.fraction = cenv.GetValue("quality.request.fraction", 0.9);
   AREA.areaR = (AREA.xmaxR-AREA.xminR)*(AREA.ymaxR-AREA.yminR);
+  B.xbin = cenv.GetValue("quality.request.stepx", 1000);
+  B.ybin = cenv.GetValue("quality.request.stepy", 1000);
+  B.nx = cenv.GetValue("quality.request.nx", 1000);
+  B.ny = cenv.GetValue("quality.request.ny", 1000);
 
   define_steps(tree);
 
