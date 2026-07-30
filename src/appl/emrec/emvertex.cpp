@@ -539,7 +539,7 @@ void ExecuteVTA(EdbVertex *vtx, EdbTrackP *track)
   if (vtx_new->Flag() != 1) {Log(2, "ExecuteVTA", "Warning, vtx new %d has flag %d", vtx->ID(), vtx_new->Flag());if (gEDBDEBUGLEVEL == 2) {vtx_new->Print();}}
   vtx_new->SetID(vtx->ID());
   if (rfEVR.MakeV(*vtx_new) ) {rfEVR.AddVertex(vtx_new);}
-  else {Log(1, "ExecuteVTA", "VERTEX %d NOT ADDED TO THE VERTEXREC", vtx_new->ID());}
+  else {Log(1, "ExecuteVTA", "VERTEX %d NOT ADDED TO THE VERTEXREC", vtx_new->ID()); rfEVR.AddVertex(vtx);}
   Log(2, "ExecuteVTA", "New vertex created vID=%d, prob is %.3f, the original one was %.3f", vtx_new->ID(), vtx_new->V()->prob(), vtx->V()->prob());
   if (outtrack->N()) {Log(2, "SplitTrack", "Track, attached to vertex vID=%d, trid=%d splitted in trid=%d (in) and in trid=%d (out)", vtx->ID(), track->ID(), intrack->ID(), outtrack->ID());}
   else {Log(2, "ExecuteVTA", "Track, attached to vertex vID=%d, trid=%d splitted in trid=%d", vtx->ID(), track->ID(), intrack->ID());}
